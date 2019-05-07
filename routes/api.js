@@ -29,35 +29,35 @@ module.exports = function(app) {
           console.log(err);
         } else {
           console.log("doc", doc);
-          res.send("c");
+          res.send(doc);
         }
       });
 
       //response will be array of book objects
-      //json res format: [{"_id": bookid, "title": book_title, "commentcount": num_of_comments },...]
+      //json res format: [{"_id": bookid, "title": book_title, "commentCount": num_of_comments },...]
     })
 
     .post(function(req, res) {
       var title = req.body.title;
-
-      books.findOne({ title }, (err, doc) => {
-        if (err) {
-          console.log(err);
-        } else if (doc) {
-          console.log("doc", doc);
-          res.send(doc);
-        } else if (!doc) {
-          console.log("g");
-          const book = books({
-            _id: new mongoose.Types.ObjectId(),
-            title: title,
-            commentCount: 1
-            // comments: [comments]
-          });
-          book.save();
-          res.send(book);
-        }
-      });
+      if (title === null || title === undefined || title === "") {
+        res.send("title is required");
+      } else {
+        books.findOne({ title }, (err, doc) => {
+          if (err) {
+            console.log(err);
+          } else if (doc) {
+            console.log("doc", doc);
+            res.send(doc);
+          } else if (!doc) {
+            const book = books({
+              _id: new mongoose.Types.ObjectId(),
+              title: title
+            });
+            book.save();
+            res.send(book);
+          }
+        });
+      }
       //response will contain new book object including atleast _id and title
     })
 
@@ -66,8 +66,8 @@ module.exports = function(app) {
         if (err) {
           throw new Error(err);
         } else {
-          console.log('deletet')
-          res.send("deletion successful");
+          console.log("deleted");
+          res.send("complete delete successful");
         }
       });
       //if successful response will be 'complete delete successful'
@@ -77,20 +77,34 @@ module.exports = function(app) {
     .route("/api/books/:id")
     .get(function(req, res) {
       var bookid = req.params.id;
-      books.findOne({ _id: bookid }, (err, doc) => {
-        if (err) {
-          console.log("findError");
-        } else if (doc) {
-          res.send(doc);
-        }
-      });
+      if (mongoose.Types.ObjectId.isValid(bookid)) {
+        books.findOne({ _id: bookid }, (err, doc) => {
+          if (err) {
+            console.log("findError");
+          } else if (doc) {
+            res.send(doc);
+          } else {
+            res.send("_id not in database");
+          }
+        });
+      } else {
+        res.send("invalid _id");
+      }
     })
     //json res format: {"_id": bookid, "title": book_title, "comments": [comment,comment,...]}
 
     .post(function(req, res) {
       var bookid = req.params.id;
-      var comment = req.body.comment;
-      //json res format same as .get
+      var commStr = req.body.comment;
+      if (mongoose.Types.ObjectId.isValid(bookid)) {
+        books.findOne({ _id: bookid }).then(function(res) {
+          res.comments.push({comment: commStr});
+          res.commentCount = res.comments.length
+          res.save();
+        });
+      } else {
+        res.send("invalid _id");
+      }
     })
 
     .delete(function(req, res) {

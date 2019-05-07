@@ -11,6 +11,7 @@ var chai = require("chai");
 var assert = chai.assert;
 var server = require("../server");
 const books = require("../models/books");
+const mongoose = require("mongoose");
 chai.use(chaiHttp);
 
 suite("Functional Tests", function() {
@@ -48,11 +49,12 @@ suite("Functional Tests", function() {
    */
 
   suite("Routing tests", function() {
+    let id;
+    mongoose.connection.collections.books.drop();
     suite(
       "POST /api/books with title => create book object/expect book object",
       function() {
         test("Test POST /api/books with title", function(done) {
-          books.collection.drop();
           chai
             .request(server)
             .post("/api/books")
@@ -60,6 +62,7 @@ suite("Functional Tests", function() {
               title: "Harry"
             })
             .end((err, res) => {
+              id = res.body._id;
               assert.equal(res.status, 200);
               assert.equal(res.body.title, "Harry");
               done();
@@ -67,34 +70,93 @@ suite("Functional Tests", function() {
         });
 
         test("Test POST /api/books with no title given", function(done) {
-          //done();
+          chai
+            .request(server)
+            .post("/api/books")
+            .send({
+              title: ""
+            })
+            .end((err, res) => {
+              assert.equal(res.status, 200);
+              assert.equal(res.text, "title is required");
+              done();
+            });
         });
       }
     );
 
     suite("GET /api/books => array of books", function() {
       test("Test GET /api/books", function(done) {
-        //done();
+        chai
+          .request(server)
+          .get("/api/books")
+          .end((err, res) => {
+            assert.equal(res.status, 200);
+            assert.property(res.body[0], "title");
+            assert.property(res.body[0], "_id");
+            done();
+          });
       });
-    });
 
-    suite("GET /api/books/[id] => book object with [id]", function() {
-      test("Test GET /api/books/[id] with id not in db", function(done) {
-        //done();
-      });
-
-      test("Test GET /api/books/[id] with valid id in db", function(done) {
-        //done();
-      });
-    });
-
-    suite(
-      "POST /api/books/[id] => add comment/expect book object with id",
-      function() {
-        test("Test POST /api/books/[id] with comment", function(done) {
-          //done();
+      suite("GET /api/books/[id] => book object with [id]", function() {
+        test("Test GET /api/books/[id] with id not in db", function(done) {
+          chai
+            .request(server)
+            .get("/api/books/5cd18f2373b5e6254cd48fb8")
+            .end((err, res) => {
+              assert.equal(res.status, 200);
+              assert.equal(res.text, "_id not in database");
+              done();
+            });
         });
-      }
-    );
+
+        test("Test GET /api/books/[id] with valid id in db", function(done) {
+          chai
+            .request(server)
+            .get(`/api/books/${id}`)
+            .end((err, res) => {
+              assert.equal(res.status, 200);
+              assert.property(res.body, "title");
+              assert.property(res.body, "_id");
+              assert.equal(res.body.title, "Harry");
+              assert.equal(res.body._id, id);
+              done();
+            });
+        });
+      });
+      suite(
+        "POST /api/books/[id] => add comment/expect book object with id",
+        function() {
+          test("Test POST /api/books/[id] with comment", function(done) {
+            const test = new books({
+              _id: new mongoose.Types.ObjectId(),
+              title: "LOTR",
+              comments: []
+            });
+            test
+              .save()
+              .then(function() {
+                books.findOne({ title: "LOTR" }).then(rec => {
+                  rec.comments.push(
+                    { comment: "good series" },
+                    { comment: "Legolas is bae" }
+                  );
+                  rec.commentCount = rec.comments.length;
+                  rec.save().then(function() {
+                    books.findOne({ title: "LOTR" }).then(function(doc) {
+                      assert(rec.commentCount === 2);
+                      assert(doc.comments.length === 2);
+                      done();
+                    });
+                  });
+                });
+              })
+              .catch(err => {
+                console.log(err);
+              });
+          });
+        }
+      );
+    });
   });
 });
