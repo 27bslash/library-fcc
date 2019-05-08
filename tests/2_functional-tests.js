@@ -128,7 +128,7 @@ suite("Functional Tests", function() {
         "POST /api/books/[id] => add comment/expect book object with id",
         function() {
           test("Test POST /api/books/[id] with comment", function(done) {
-            const test = new books({
+            const test = books({
               _id: new mongoose.Types.ObjectId(),
               title: "LOTR",
               comments: []
@@ -139,7 +139,7 @@ suite("Functional Tests", function() {
                 books.findOne({ title: "LOTR" }).then(rec => {
                   rec.comments.push(
                     { comment: "good series" },
-                    { comment: "Legolas is bae" }
+                    { comment: "comment" }
                   );
                   rec.commentCount = rec.comments.length;
                   rec.save().then(function() {

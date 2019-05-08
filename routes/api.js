@@ -8,13 +8,10 @@
 
 "use strict";
 
-var expect = require("chai").expect;
-var MongoClient = require("mongodb").MongoClient;
-var ObjectId = require("mongodb").ObjectId;
+
 const dotenv = require("dotenv").config();
 const mongoose = require("mongoose");
 const books = require("../models/books");
-const comments = require("../models/comments");
 //Example connection: MongoClient.connect(MONGODB_CONNECTION_STRING, function(err, db) {});
 mongoose.connect(process.env.DB);
 mongoose.promise = global.Promise;
@@ -28,25 +25,23 @@ module.exports = function(app) {
         if (err) {
           console.log(err);
         } else {
-          console.log("doc", doc);
-          res.send(doc);
+          res.json(doc);
         }
       });
-
       //response will be array of book objects
       //json res format: [{"_id": bookid, "title": book_title, "commentCount": num_of_comments },...]
     })
 
     .post(function(req, res) {
       var title = req.body.title;
-      if (title === null || title === undefined || title === "") {
+      let result = {};
+      if (!title) {
         res.send("title is required");
       } else {
         books.findOne({ title }, (err, doc) => {
           if (err) {
             console.log(err);
           } else if (doc) {
-            console.log("doc", doc);
             res.send(doc);
           } else if (!doc) {
             const book = books({
@@ -54,7 +49,9 @@ module.exports = function(app) {
               title: title
             });
             book.save();
-            res.send(book);
+            result._id = book._id;
+            result.title = book.title;
+            res.send(result);
           }
         });
       }
@@ -66,7 +63,6 @@ module.exports = function(app) {
         if (err) {
           throw new Error(err);
         } else {
-          console.log("deleted");
           res.send("complete delete successful");
         }
       });
@@ -82,7 +78,7 @@ module.exports = function(app) {
           if (err) {
             console.log("findError");
           } else if (doc) {
-            res.send(doc);
+            res.json(doc);
           } else {
             res.send("_id not in database");
           }
@@ -96,12 +92,30 @@ module.exports = function(app) {
     .post(function(req, res) {
       var bookid = req.params.id;
       var commStr = req.body.comment;
-      if (mongoose.Types.ObjectId.isValid(bookid)) {
-        books.findOne({ _id: bookid }).then(function(res) {
-          res.comments.push({comment: commStr});
-          res.commentCount = res.comments.length
-          res.save();
-        });
+      let title;
+      let result = {
+        _id: bookid,
+        title,
+        comments: []
+      };
+      if (!commStr) {
+        res.send("please enter a comment");
+      } else if (mongoose.Types.ObjectId.isValid(bookid)) {
+        books
+          .findOne({ _id: bookid })
+          .then(function(doc) {
+            doc.comments.push({ comment: commStr });
+            doc.commentCount = doc.comments.length;
+            doc.save();
+            result.title = doc.title;
+            result.commentCount = doc.commentCount;
+            result.comments = doc.comments;
+            res.send(result);
+          })
+          .catch(err => {
+            console.log(err);
+            res.send("_id not in DB");
+          });
       } else {
         res.send("invalid _id");
       }
